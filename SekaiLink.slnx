@@ -1,24 +1,24 @@
 <Solution>
-  <Folder Name="/Devices/">
-    <Project Path="SekaiLink.Oppo.Devices/SekaiLink.Oppo.Devices.csproj" />
-    <Project Path="SekaiLink.Rose.Devices/SekaiLink.Rose.Devices.csproj" />
-  </Folder>
-  <Folder Name="/Platform/">
-    <Project Path="SekaiLink.Native.Windows/SekaiLink.Native.Windows.csproj" />
-  </Folder>
-  <Folder Name="/Protocols/">
-    <Project Path="SekaiLink.Protocols/SekaiLink.Protocols.csproj" />
-  </Folder>
-  <Folder Name="/Protocols/Brands/">
-    <Project Path="SekaiLink.Moondrop.Protocol/SekaiLink.Moondrop.Protocol.csproj" />
-    <Project Path="SekaiLink.Oppo.Protocol/SekaiLink.Oppo.Protocol.csproj" />
-    <Project Path="SekaiLink.Rose.Protocol/SekaiLink.Rose.Protocol.csproj" />
-  </Folder>
-  <Folder Name="/Router/">
-    <Project Path="SekaiLink.Router.Generators/SekaiLink.Router.Generators.csproj" />
-    <Project Path="SekaiLink.Router/SekaiLink.Router.csproj" />
-  </Folder>
-  <Folder Name="/Shell/">
-    <Project Path="SekaiLink.Console/SekaiLink.Console.csproj" />
-  </Folder>
+    <Folder Name="/Devices/">
+        <Project Path="SekaiLink.Oppo.Devices/SekaiLink.Oppo.Devices.csproj"/>
+        <Project Path="SekaiLink.Rose.Devices/SekaiLink.Rose.Devices.csproj"/>
+    </Folder>
+    <Folder Name="/Platform/">
+        <Project Path="SekaiLink.Native.Windows/SekaiLink.Native.Windows.csproj"/>
+    </Folder>
+    <Folder Name="/Protocols/">
+        <Project Path="SekaiLink.Protocols/SekaiLink.Protocols.csproj"/>
+    </Folder>
+    <Folder Name="/Protocols/Brands/">
+        <Project Path="SekaiLink.Moondrop.Protocol/SekaiLink.Moondrop.Protocol.csproj"/>
+        <Project Path="SekaiLink.Oppo.Protocol/SekaiLink.Oppo.Protocol.csproj"/>
+        <Project Path="SekaiLink.Rose.Protocol/SekaiLink.Rose.Protocol.csproj"/>
+    </Folder>
+    <Folder Name="/Router/">
+        <Project Path="SekaiLink.Router.Generators/SekaiLink.Router.Generators.csproj"/>
+        <Project Path="SekaiLink.Router/SekaiLink.Router.csproj"/>
+    </Folder>
+    <Folder Name="/Shell/">
+        <Project Path="SekaiLink.Console/SekaiLink.Console.csproj"/>
+    </Folder>
 </Solution>

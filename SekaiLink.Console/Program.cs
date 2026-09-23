@@ -1,11 +1,11 @@
 using System.Text;
 using SekaiLink.ConsoleApp;
 
-System.Console.InputEncoding = Encoding.UTF8;
-System.Console.OutputEncoding = Encoding.UTF8;
+Console.InputEncoding = Encoding.UTF8;
+Console.OutputEncoding = Encoding.UTF8;
 
 using var cancellation = new CancellationTokenSource();
-System.Console.CancelKeyPress += (_, eventArgs) =>
+Console.CancelKeyPress += (_, eventArgs) =>
 {
     eventArgs.Cancel = true;
     cancellation.Cancel();
@@ -18,18 +18,18 @@ try
 }
 catch (CommandLineException exception)
 {
-    System.Console.Error.WriteLine($"参数错误: {exception.Message}");
-    System.Console.Error.WriteLine("使用 sekailink help 查看帮助。");
+    Console.Error.WriteLine($"参数错误: {exception.Message}");
+    Console.Error.WriteLine("使用 sekailink help 查看帮助。");
     return 2;
 }
 catch (OperationCanceledException)
 {
-    System.Console.Error.WriteLine("操作已取消。");
+    Console.Error.WriteLine("操作已取消。");
     return 130;
 }
 catch (Exception exception)
 {
-    System.Console.Error.WriteLine($"操作失败: {exception.Message}");
+    Console.Error.WriteLine($"操作失败: {exception.Message}");
     return 1;
 }
 
@@ -55,7 +55,9 @@ static async Task<int> RunAsync(CommandLine commandLine, CancellationToken cance
             await service.ScanAsync(seconds, commandLine.HasOption("all"), cancellationToken);
             return 0;
         case "devices":
-            service.ListDevices(commandLine.Positionals.Count > 1 ? string.Join(' ', commandLine.Positionals.Skip(1)) : null);
+            service.ListDevices(commandLine.Positionals.Count > 1
+                ? string.Join(' ', commandLine.Positionals.Skip(1))
+                : null);
             return 0;
         case "info":
             RequirePositionals(commandLine, 2, "info <型号 ID>");
@@ -79,6 +81,7 @@ static async Task<int> RunAsync(CommandLine commandLine, CancellationToken cance
                 address = args[0];
                 args = args.Skip(1).ToArray();
             }
+
             if (args.Length == 0) throw new CommandLineException("缺少设备操作。");
             await service.SendAsync(address, device, transport, args,
                 commandLine.GetIntOption("listen", 1, 0, 300), seconds,
@@ -91,6 +94,7 @@ static async Task<int> RunAsync(CommandLine commandLine, CancellationToken cance
                 if (address != null) throw new CommandLineException("蓝牙地址只能指定一次。");
                 address = commandLine.Positionals[1];
             }
+
             await service.ShellAsync(address, device, transport, seconds, cancellationToken);
             return 0;
         default:
@@ -101,8 +105,9 @@ static async Task<int> RunAsync(CommandLine commandLine, CancellationToken cance
 static string? RequiredOption(CommandLine commandLine, string name)
 {
     if (!commandLine.HasOption(name)) return null;
-    return commandLine.GetOption(name) is { Length: > 0 } value ? value :
-        throw new CommandLineException($"--{name} 需要参数。");
+    return commandLine.GetOption(name) is { Length: > 0 } value
+        ? value
+        : throw new CommandLineException($"--{name} 需要参数。");
 }
 
 static bool LooksLikeAddress(string value)
@@ -118,25 +123,25 @@ static void RequirePositionals(CommandLine commandLine, int count, string usage)
 
 static void PrintHelp()
 {
-    System.Console.WriteLine("SekaiLink Windows 命令行工具");
-    System.Console.WriteLine();
-    System.Console.WriteLine("默认自动搜索设备；找到多台时使用 --address 选择。");
-    System.Console.WriteLine("  sekailink scan [--seconds 8] [--all]");
-    System.Console.WriteLine("  sekailink devices [筛选词]");
-    System.Console.WriteLine("  sekailink info <型号 ID>");
-    System.Console.WriteLine("  sekailink commands <型号 ID> [--transport gatt|rfcomm]");
-    System.Console.WriteLine("  sekailink decode <型号 ID> <十六进制报文> [--transport gatt|rfcomm]");
-    System.Console.WriteLine("  sekailink send <操作> [参数] [--address 地址] [--device 型号ID] [--transport gatt|rfcomm]");
-    System.Console.WriteLine("  sekailink shell [--address 地址] [--device 型号ID] [--transport gatt|rfcomm]");
-    System.Console.WriteLine("  send 可添加 --dry-run、--listen 秒数、--seconds 搜索秒数。");
-    System.Console.WriteLine();
-    System.Console.WriteLine("操作:");
+    Console.WriteLine("SekaiLink Windows 命令行工具");
+    Console.WriteLine();
+    Console.WriteLine("默认自动搜索设备；找到多台时使用 --address 选择。");
+    Console.WriteLine("  sekailink scan [--seconds 8] [--all]");
+    Console.WriteLine("  sekailink devices [筛选词]");
+    Console.WriteLine("  sekailink info <型号 ID>");
+    Console.WriteLine("  sekailink commands <型号 ID> [--transport gatt|rfcomm]");
+    Console.WriteLine("  sekailink decode <型号 ID> <十六进制报文> [--transport gatt|rfcomm]");
+    Console.WriteLine("  sekailink send <操作> [参数] [--address 地址] [--device 型号ID] [--transport gatt|rfcomm]");
+    Console.WriteLine("  sekailink shell [--address 地址] [--device 型号ID] [--transport gatt|rfcomm]");
+    Console.WriteLine("  send 可添加 --dry-run、--listen 秒数、--seconds 搜索秒数。");
+    Console.WriteLine();
+    Console.WriteLine("操作:");
     DeviceConsoleService.PrintActionHelp();
-    System.Console.WriteLine();
-    System.Console.WriteLine("示例:");
-    System.Console.WriteLine("  sekailink send get battery");
-    System.Console.WriteLine("  sekailink send noise anc --address AA:BB:CC:DD:EE:FF");
-    System.Console.WriteLine("  sekailink send eq M1 --device 06F010 --address AA:BB:CC:DD:EE:FF");
-    System.Console.WriteLine("  sekailink send get noise --device ceramics-mk2 --address AA:BB:CC:DD:EE:FF");
-    System.Console.WriteLine("  sekailink send noise anc --device 06F010 --dry-run");
+    Console.WriteLine();
+    Console.WriteLine("示例:");
+    Console.WriteLine("  sekailink send get battery");
+    Console.WriteLine("  sekailink send noise anc --address AA:BB:CC:DD:EE:FF");
+    Console.WriteLine("  sekailink send eq M1 --device 06F010 --address AA:BB:CC:DD:EE:FF");
+    Console.WriteLine("  sekailink send get noise --device ceramics-mk2 --address AA:BB:CC:DD:EE:FF");
+    Console.WriteLine("  sekailink send noise anc --device 06F010 --dry-run");
 }

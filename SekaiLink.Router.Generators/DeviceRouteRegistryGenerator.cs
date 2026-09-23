@@ -36,7 +36,8 @@ public sealed class DeviceRouteRegistryGenerator : IIncrementalGenerator
         source.AppendLine("{");
         source.AppendLine("    internal static partial class DeviceRouteRegistry");
         source.AppendLine("    {");
-        source.AppendLine("        static partial void AddGenerated(global::System.Collections.Generic.ICollection<global::SekaiLink.Protocols.Routing.IDeviceRouteProvider> providers)");
+        source.AppendLine(
+            "        static partial void AddGenerated(global::System.Collections.Generic.ICollection<global::SekaiLink.Protocols.Routing.IDeviceRouteProvider> providers)");
         source.AppendLine("        {");
         foreach (var name in names)
             source.Append("            providers.Add(new ").Append(name).AppendLine("());");

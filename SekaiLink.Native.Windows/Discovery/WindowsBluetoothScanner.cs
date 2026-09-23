@@ -4,19 +4,20 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using SekaiLink.Native.Windows.Internal;
-using SekaiLink.Protocols.Models;
-using SekaiLink.Protocols.Transport;
 using Windows.Devices.Bluetooth;
 using Windows.Devices.Bluetooth.Advertisement;
 using Windows.Storage.Streams;
+using SekaiLink.Native.Windows.Internal;
+using SekaiLink.Protocols.Models;
+using SekaiLink.Protocols.Transport;
 using DeviceInformation = Windows.Devices.Enumeration.DeviceInformation;
 
 namespace SekaiLink.Native.Windows.Discovery;
 
 public sealed class WindowsBluetoothDevice
 {
-    public WindowsBluetoothDevice(DeviceIdentity identity, TransportEndpoint endpoint, short? signalStrength = null, bool isPaired = false)
+    public WindowsBluetoothDevice(DeviceIdentity identity, TransportEndpoint endpoint, short? signalStrength = null,
+        bool isPaired = false)
     {
         Identity = identity ?? throw new ArgumentNullException(nameof(identity));
         Endpoint = endpoint ?? throw new ArgumentNullException(nameof(endpoint));
@@ -32,15 +33,19 @@ public sealed class WindowsBluetoothDevice
 
 public sealed class WindowsBluetoothDeviceEventArgs : EventArgs
 {
-    public WindowsBluetoothDeviceEventArgs(WindowsBluetoothDevice device) => Device = device;
+    public WindowsBluetoothDeviceEventArgs(WindowsBluetoothDevice device)
+    {
+        Device = device;
+    }
+
     public WindowsBluetoothDevice Device { get; }
 }
 
 /// <summary>Discovers BLE advertisements and enumerates paired Bluetooth Classic devices.</summary>
 public sealed class WindowsBluetoothScanner : IDisposable
 {
-    private readonly BluetoothLEAdvertisementWatcher _watcher;
     private readonly ConcurrentDictionary<ulong, WindowsBluetoothDevice> _devices = new();
+    private readonly BluetoothLEAdvertisementWatcher _watcher;
     private bool _disposed;
 
     public WindowsBluetoothScanner()
@@ -55,6 +60,15 @@ public sealed class WindowsBluetoothScanner : IDisposable
 
     public bool IsScanning => _watcher.Status == BluetoothLEAdvertisementWatcherStatus.Started;
     public IReadOnlyCollection<WindowsBluetoothDevice> Devices => _devices.Values.ToArray();
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        if (IsScanning) _watcher.Stop();
+        _watcher.Received -= OnAdvertisementReceived;
+        _watcher.Stopped -= OnWatcherStopped;
+        _disposed = true;
+    }
 
     public event EventHandler<WindowsBluetoothDeviceEventArgs>? DeviceFound;
     public event EventHandler<Exception?>? ScanStopped;
@@ -74,9 +88,13 @@ public sealed class WindowsBluetoothScanner : IDisposable
         if (IsScanning) _watcher.Stop();
     }
 
-    public void Clear() => _devices.Clear();
+    public void Clear()
+    {
+        _devices.Clear();
+    }
 
-    public async Task<IReadOnlyList<WindowsBluetoothDevice>> GetPairedClassicDevicesAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<WindowsBluetoothDevice>> GetPairedClassicDevicesAsync(
+        CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
         cancellationToken.ThrowIfCancellationRequested();
@@ -106,10 +124,12 @@ public sealed class WindowsBluetoothScanner : IDisposable
                 device.Dispose();
             }
         }
+
         return result;
     }
 
-    private void OnAdvertisementReceived(BluetoothLEAdvertisementWatcher sender, BluetoothLEAdvertisementReceivedEventArgs args)
+    private void OnAdvertisementReceived(BluetoothLEAdvertisementWatcher sender,
+        BluetoothLEAdvertisementReceivedEventArgs args)
     {
         var advertisement = args.Advertisement;
         var address = BluetoothEndpoint.FormatAddress(args.BluetoothAddress);
@@ -138,7 +158,8 @@ public sealed class WindowsBluetoothScanner : IDisposable
         DeviceFound?.Invoke(this, new WindowsBluetoothDeviceEventArgs(discovered));
     }
 
-    private void OnWatcherStopped(BluetoothLEAdvertisementWatcher sender, BluetoothLEAdvertisementWatcherStoppedEventArgs args)
+    private void OnWatcherStopped(BluetoothLEAdvertisementWatcher sender,
+        BluetoothLEAdvertisementWatcherStoppedEventArgs args)
     {
         var error = args.Error == BluetoothError.Success
             ? null
@@ -149,14 +170,5 @@ public sealed class WindowsBluetoothScanner : IDisposable
     private void ThrowIfDisposed()
     {
         if (_disposed) throw new ObjectDisposedException(nameof(WindowsBluetoothScanner));
-    }
-
-    public void Dispose()
-    {
-        if (_disposed) return;
-        if (IsScanning) _watcher.Stop();
-        _watcher.Received -= OnAdvertisementReceived;
-        _watcher.Stopped -= OnWatcherStopped;
-        _disposed = true;
     }
 }

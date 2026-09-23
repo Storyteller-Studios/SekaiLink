@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using SekaiLink.Oppo.Devices;
 using SekaiLink.Oppo.Protocol.Protocols;
 using SekaiLink.Protocols.Abstractions;
-using SekaiLink.Protocols.Features;
 using SekaiLink.Protocols.Models;
 using SekaiLink.Protocols.Routing;
 using SekaiLink.Rose.Devices;
@@ -14,10 +13,10 @@ namespace SekaiLink.Router;
 /// <summary>Console-facing frame adapter selected from a routed device definition.</summary>
 public sealed class DevicePacketCodec
 {
-    private readonly RoseDeviceDefinition? _rose;
     private readonly OppoDeviceDefinition? _oppo;
-    private readonly IFrameCodec<RoseFrame>? _roseCodec;
     private readonly IFrameCodec<OppoFrame>? _oppoCodec;
+    private readonly RoseDeviceDefinition? _rose;
+    private readonly IFrameCodec<RoseFrame>? _roseCodec;
 
     public DevicePacketCodec(DeviceRoute route)
     {
@@ -36,20 +35,25 @@ public sealed class DevicePacketCodec
     }
 
     public bool SupportsStructuredCommands => _oppo != null ||
-        _rose != null && _rose.CommandMapper != null && (_rose.Family == RoseFamily.F8 || _roseCodec != null);
+                                              (_rose != null && _rose.CommandMapper != null &&
+                                               (_rose.Family == RoseFamily.F8 || _roseCodec != null));
+
     public bool SupportsProductIdQuery => _oppoCodec != null;
 
     public IReadOnlyList<FeatureDefinition> InitializationCommands =>
-        _rose?.CommandMapper?.InitializationCommands ?? _oppo?.CommandMapper.InitializationCommands ?? Array.Empty<FeatureDefinition>();
+        _rose?.CommandMapper?.InitializationCommands ??
+        _oppo?.CommandMapper.InitializationCommands ?? Array.Empty<FeatureDefinition>();
 
     public byte[] Encode(FeatureDefinition command)
     {
         if (_rose != null && _rose.CommandMapper != null)
         {
             var frame = _rose.CommandMapper.Encode(command);
-            return _rose.Family == RoseFamily.F8 ? (byte[])frame.Payload.Clone() :
-                _roseCodec?.Encode(frame) ?? throw new NotSupportedException("该设备没有结构化帧编码器。");
+            return _rose.Family == RoseFamily.F8
+                ? (byte[])frame.Payload.Clone()
+                : _roseCodec?.Encode(frame) ?? throw new NotSupportedException("该设备没有结构化帧编码器。");
         }
+
         if (_oppo != null && _oppoCodec != null)
             return _oppoCodec.Encode(_oppo.CommandMapper.Encode(command));
         throw new NotSupportedException("该设备目前仅支持 raw 操作。");
@@ -82,8 +86,10 @@ public sealed class DevicePacketCodec
             if (result.Status != FrameParseStatus.Frame) return Raw(bytes, result.Status.ToString(), result.Error);
             var frame = result.Frame;
             var label = _rose?.CommandMapper?.GetResponseIdentifier(frame);
-            return $"group=0x{frame.Group:X2} command=0x{frame.Command:X2}{Name(label)} sequence={frame.Sequence} payload={Hex(frame.Payload)}";
+            return
+                $"group=0x{frame.Group:X2} command=0x{frame.Command:X2}{Name(label)} sequence={frame.Sequence} payload={Hex(frame.Payload)}";
         }
+
         if (_oppoCodec != null)
         {
             var result = _oppoCodec.TryDecode(bytes);
@@ -93,12 +99,24 @@ public sealed class DevicePacketCodec
             if (OppoCommands.TryParseProductId(frame, out var productId)) label = $"product-id:{productId}";
             return $"command=0x{frame.Command:X4}{Name(label)} sequence={frame.Sequence} payload={Hex(frame.Payload)}";
         }
+
         return Raw(bytes);
     }
 
-    private static string Name(string? label) => label is null ? string.Empty : $" name={label}";
-    private static string Raw(byte[] bytes, string? status = null, string? error = null) =>
-        $"RAW {Hex(bytes)}" + (status == null ? string.Empty :
-            $" ({status}{(string.IsNullOrWhiteSpace(error) ? string.Empty : $": {error}")})");
-    private static string Hex(byte[] bytes) => BitConverter.ToString(bytes).Replace("-", string.Empty);
+    private static string Name(string? label)
+    {
+        return label is null ? string.Empty : $" name={label}";
+    }
+
+    private static string Raw(byte[] bytes, string? status = null, string? error = null)
+    {
+        return $"RAW {Hex(bytes)}" + (status == null
+            ? string.Empty
+            : $" ({status}{(string.IsNullOrWhiteSpace(error) ? string.Empty : $": {error}")})");
+    }
+
+    private static string Hex(byte[] bytes)
+    {
+        return BitConverter.ToString(bytes).Replace("-", string.Empty);
+    }
 }

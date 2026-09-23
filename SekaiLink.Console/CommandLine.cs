@@ -13,15 +13,22 @@ internal sealed class CommandLine
 
     public IReadOnlyList<string> Positionals { get; }
 
-    public bool HasOption(string name) => _options.ContainsKey(name);
+    public bool HasOption(string name)
+    {
+        return _options.ContainsKey(name);
+    }
 
-    public string? GetOption(string name) => _options.TryGetValue(name, out var value) ? value : null;
+    public string? GetOption(string name)
+    {
+        return _options.TryGetValue(name, out var value) ? value : null;
+    }
 
     public int GetIntOption(string name, int fallback, int minimum, int maximum)
     {
         var value = GetOption(name);
         if (value is null) return fallback;
-        if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) || parsed < minimum || parsed > maximum)
+        if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) ||
+            parsed < minimum || parsed > maximum)
             throw new CommandLineException($"--{name} 必须是 {minimum} 到 {maximum} 之间的整数。");
         return parsed;
     }
@@ -54,15 +61,21 @@ internal sealed class CommandLine
             else
                 result._options[option] = null;
         }
+
         return result;
     }
 
-    private static bool IsFlag(string option) => option.Equals("all", StringComparison.OrdinalIgnoreCase)
-        || option.Equals("dry-run", StringComparison.OrdinalIgnoreCase)
-        || option.Equals("help", StringComparison.OrdinalIgnoreCase);
+    private static bool IsFlag(string option)
+    {
+        return option.Equals("all", StringComparison.OrdinalIgnoreCase)
+               || option.Equals("dry-run", StringComparison.OrdinalIgnoreCase)
+               || option.Equals("help", StringComparison.OrdinalIgnoreCase);
+    }
 }
 
 internal sealed class CommandLineException : Exception
 {
-    public CommandLineException(string message) : base(message) { }
+    public CommandLineException(string message) : base(message)
+    {
+    }
 }

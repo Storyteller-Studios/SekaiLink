@@ -1,18 +1,18 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <TargetFramework>netstandard2.1</TargetFramework>
-    <Nullable>enable</Nullable>
-    <LangVersion>latest</LangVersion>
-  </PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\SekaiLink.Protocols\SekaiLink.Protocols.csproj" />
-    <ProjectReference Include="..\SekaiLink.Rose.Devices\SekaiLink.Rose.Devices.csproj" />
-    <ProjectReference Include="..\SekaiLink.Oppo.Protocol\SekaiLink.Oppo.Protocol.csproj" />
-    <ProjectReference Include="..\SekaiLink.Oppo.Devices\SekaiLink.Oppo.Devices.csproj" />
-    <ProjectReference Include="..\SekaiLink.Moondrop.Protocol\SekaiLink.Moondrop.Protocol.csproj" />
-    <ProjectReference Include="..\SekaiLink.Router.Generators\SekaiLink.Router.Generators.csproj"
-                      OutputItemType="Analyzer"
-                      ReferenceOutputAssembly="false" />
-    <PackageReference Include="PolySharp" Version="1.15.0" PrivateAssets="all" />
-  </ItemGroup>
+    <PropertyGroup>
+        <TargetFramework>netstandard2.1</TargetFramework>
+        <Nullable>enable</Nullable>
+        <LangVersion>latest</LangVersion>
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\SekaiLink.Protocols\SekaiLink.Protocols.csproj"/>
+        <ProjectReference Include="..\SekaiLink.Rose.Devices\SekaiLink.Rose.Devices.csproj"/>
+        <ProjectReference Include="..\SekaiLink.Oppo.Protocol\SekaiLink.Oppo.Protocol.csproj"/>
+        <ProjectReference Include="..\SekaiLink.Oppo.Devices\SekaiLink.Oppo.Devices.csproj"/>
+        <ProjectReference Include="..\SekaiLink.Moondrop.Protocol\SekaiLink.Moondrop.Protocol.csproj"/>
+        <ProjectReference Include="..\SekaiLink.Router.Generators\SekaiLink.Router.Generators.csproj"
+                          OutputItemType="Analyzer"
+                          ReferenceOutputAssembly="false"/>
+        <PackageReference Include="PolySharp" Version="1.15.0" PrivateAssets="all"/>
+    </ItemGroup>
 </Project>

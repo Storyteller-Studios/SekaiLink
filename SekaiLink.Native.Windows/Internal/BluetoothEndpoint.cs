@@ -16,7 +16,7 @@ internal static class BluetoothEndpoint
         if (normalized.StartsWith("0x", StringComparison.OrdinalIgnoreCase)) normalized = normalized[2..];
 
         return normalized.Length is > 0 and <= 12
-            && ulong.TryParse(normalized, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out address);
+               && ulong.TryParse(normalized, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out address);
     }
 
     public static string FormatAddress(ulong address)

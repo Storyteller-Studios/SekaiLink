@@ -2,11 +2,11 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using SekaiLink.Native.Windows.Internal;
-using SekaiLink.Protocols.Transport;
 using Windows.Devices.Bluetooth;
 using Windows.Devices.Bluetooth.GenericAttributeProfile;
 using Windows.Storage.Streams;
+using SekaiLink.Native.Windows.Internal;
+using SekaiLink.Protocols.Transport;
 
 namespace SekaiLink.Native.Windows;
 
@@ -15,16 +15,15 @@ public sealed class BleGattTransport : IProtocolTransport
 {
     private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
     private BluetoothLEDevice? _device;
-    private GattDeviceService? _service;
-    private GattCharacteristic? _writeCharacteristic;
-    private GattCharacteristic? _notifyCharacteristic;
-    private GattSession? _session;
     private bool _disposed;
-    private int? _maximumWriteLength;
+    private GattCharacteristic? _notifyCharacteristic;
+    private GattDeviceService? _service;
+    private GattSession? _session;
+    private GattCharacteristic? _writeCharacteristic;
 
     public TransportKind Kind => TransportKind.BleGatt;
     public TransportState State { get; private set; } = TransportState.Disconnected;
-    public int? MaximumWriteLength => _maximumWriteLength;
+    public int? MaximumWriteLength { get; private set; }
 
     public event EventHandler<TransportDataReceivedEventArgs>? DataReceived;
     public event EventHandler<TransportStateChangedEventArgs>? StateChanged;
@@ -46,40 +45,47 @@ public sealed class BleGattTransport : IProtocolTransport
             try
             {
                 var serviceUuid = BluetoothEndpoint.RequireGuid(endpoint.ServiceId, nameof(endpoint.ServiceId));
-                var writeUuid = BluetoothEndpoint.RequireGuid(endpoint.WriteCharacteristicId, nameof(endpoint.WriteCharacteristicId));
-                var notifyUuid = BluetoothEndpoint.RequireGuid(endpoint.NotifyCharacteristicId, nameof(endpoint.NotifyCharacteristicId));
+                var writeUuid = BluetoothEndpoint.RequireGuid(endpoint.WriteCharacteristicId,
+                    nameof(endpoint.WriteCharacteristicId));
+                var notifyUuid = BluetoothEndpoint.RequireGuid(endpoint.NotifyCharacteristicId,
+                    nameof(endpoint.NotifyCharacteristicId));
 
                 cancellationToken.ThrowIfCancellationRequested();
                 _device = await OpenDeviceAsync(endpoint.Address).ConfigureAwait(false)
-                    ?? throw new InvalidOperationException("The Bluetooth LE device could not be opened. Ensure it is in range and Bluetooth access is allowed.");
+                          ?? throw new InvalidOperationException(
+                              "The Bluetooth LE device could not be opened. Ensure it is in range and Bluetooth access is allowed.");
                 _device.ConnectionStatusChanged += OnConnectionStatusChanged;
 
                 var services = await _device.GetGattServicesForUuidAsync(serviceUuid, BluetoothCacheMode.Uncached);
                 EnsureSuccess(services.Status, "discover GATT service");
                 _service = services.Services.FirstOrDefault()
-                    ?? throw new InvalidOperationException($"GATT service {serviceUuid} was not found.");
+                           ?? throw new InvalidOperationException($"GATT service {serviceUuid} was not found.");
 
                 var writes = await _service.GetCharacteristicsForUuidAsync(writeUuid, BluetoothCacheMode.Uncached);
                 EnsureSuccess(writes.Status, "discover write characteristic");
                 _writeCharacteristic = writes.Characteristics.FirstOrDefault()
-                    ?? throw new InvalidOperationException($"GATT write characteristic {writeUuid} was not found.");
+                                       ?? throw new InvalidOperationException(
+                                           $"GATT write characteristic {writeUuid} was not found.");
 
-                var notifications = await _service.GetCharacteristicsForUuidAsync(notifyUuid, BluetoothCacheMode.Uncached);
+                var notifications =
+                    await _service.GetCharacteristicsForUuidAsync(notifyUuid, BluetoothCacheMode.Uncached);
                 EnsureSuccess(notifications.Status, "discover notification characteristic");
                 _notifyCharacteristic = notifications.Characteristics.FirstOrDefault()
-                    ?? throw new InvalidOperationException($"GATT notification characteristic {notifyUuid} was not found.");
+                                        ?? throw new InvalidOperationException(
+                                            $"GATT notification characteristic {notifyUuid} was not found.");
 
                 _session = await GattSession.FromDeviceIdAsync(_device.BluetoothDeviceId);
                 if (_session is not null)
                 {
                     _session.MaintainConnection = true;
-                    _maximumWriteLength = Math.Max(1, _session.MaxPduSize - 3);
+                    MaximumWriteLength = Math.Max(1, _session.MaxPduSize - 3);
                     _session.MaxPduSizeChanged += OnMaxPduSizeChanged;
                 }
 
                 _notifyCharacteristic.ValueChanged += OnValueChanged;
                 var cccd = SelectNotificationMode(_notifyCharacteristic.CharacteristicProperties);
-                var configurationStatus = await _notifyCharacteristic.WriteClientCharacteristicConfigurationDescriptorAsync(cccd);
+                var configurationStatus =
+                    await _notifyCharacteristic.WriteClientCharacteristicConfigurationDescriptorAsync(cccd);
                 EnsureSuccess(configurationStatus, "enable GATT notifications");
                 cancellationToken.ThrowIfCancellationRequested();
                 SetState(TransportState.Ready);
@@ -103,7 +109,7 @@ public sealed class BleGattTransport : IProtocolTransport
         ThrowIfDisposed();
         if (State != TransportState.Ready || _writeCharacteristic is null)
             throw new InvalidOperationException("The BLE GATT transport is not ready.");
-        if (_maximumWriteLength is int maximum && data.Length > maximum)
+        if (MaximumWriteLength is int maximum && data.Length > maximum)
             throw new ArgumentException($"Payload exceeds the GATT write limit of {maximum} bytes.", nameof(data));
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -136,6 +142,14 @@ public sealed class BleGattTransport : IProtocolTransport
         }
     }
 
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) return;
+        await DisconnectAsync().ConfigureAwait(false);
+        _disposed = true;
+        _lifecycleLock.Dispose();
+    }
+
     private static async Task<BluetoothLEDevice?> OpenDeviceAsync(string address)
     {
         return BluetoothEndpoint.TryParseAddress(address, out var bluetoothAddress)
@@ -143,13 +157,15 @@ public sealed class BleGattTransport : IProtocolTransport
             : await BluetoothLEDevice.FromIdAsync(address);
     }
 
-    private static GattClientCharacteristicConfigurationDescriptorValue SelectNotificationMode(GattCharacteristicProperties properties)
+    private static GattClientCharacteristicConfigurationDescriptorValue SelectNotificationMode(
+        GattCharacteristicProperties properties)
     {
         if (properties.HasFlag(GattCharacteristicProperties.Notify))
             return GattClientCharacteristicConfigurationDescriptorValue.Notify;
         if (properties.HasFlag(GattCharacteristicProperties.Indicate))
             return GattClientCharacteristicConfigurationDescriptorValue.Indicate;
-        throw new InvalidOperationException("The selected GATT characteristic does not support notifications or indications.");
+        throw new InvalidOperationException(
+            "The selected GATT characteristic does not support notifications or indications.");
     }
 
     private void OnValueChanged(GattCharacteristic sender, GattValueChangedEventArgs args)
@@ -157,7 +173,8 @@ public sealed class BleGattTransport : IProtocolTransport
         var reader = DataReader.FromBuffer(args.CharacteristicValue);
         var bytes = new byte[reader.UnconsumedBufferLength];
         reader.ReadBytes(bytes);
-        DataReceived?.Invoke(this, new TransportDataReceivedEventArgs(bytes, sender.Uuid.ToString("D"), args.Timestamp));
+        DataReceived?.Invoke(this,
+            new TransportDataReceivedEventArgs(bytes, sender.Uuid.ToString("D"), args.Timestamp));
     }
 
     private void OnConnectionStatusChanged(BluetoothLEDevice sender, object args)
@@ -166,8 +183,10 @@ public sealed class BleGattTransport : IProtocolTransport
             SetState(TransportState.Disconnected);
     }
 
-    private void OnMaxPduSizeChanged(GattSession sender, object args) =>
-        _maximumWriteLength = Math.Max(1, sender.MaxPduSize - 3);
+    private void OnMaxPduSizeChanged(GattSession sender, object args)
+    {
+        MaximumWriteLength = Math.Max(1, sender.MaxPduSize - 3);
+    }
 
     private void Cleanup()
     {
@@ -178,6 +197,7 @@ public sealed class BleGattTransport : IProtocolTransport
             _session.MaintainConnection = false;
             _session.Dispose();
         }
+
         if (_device is not null) _device.ConnectionStatusChanged -= OnConnectionStatusChanged;
         _service?.Dispose();
         _device?.Dispose();
@@ -186,7 +206,7 @@ public sealed class BleGattTransport : IProtocolTransport
         _writeCharacteristic = null;
         _service = null;
         _device = null;
-        _maximumWriteLength = null;
+        MaximumWriteLength = null;
     }
 
     private static void EnsureSuccess(GattCommunicationStatus status, string operation)
@@ -204,13 +224,5 @@ public sealed class BleGattTransport : IProtocolTransport
     private void ThrowIfDisposed()
     {
         if (_disposed) throw new ObjectDisposedException(nameof(BleGattTransport));
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (_disposed) return;
-        await DisconnectAsync().ConfigureAwait(false);
-        _disposed = true;
-        _lifecycleLock.Dispose();
     }
 }

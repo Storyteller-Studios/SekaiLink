@@ -2,12 +2,12 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using SekaiLink.Native.Windows.Internal;
-using SekaiLink.Protocols.Transport;
 using Windows.Devices.Bluetooth;
 using Windows.Devices.Bluetooth.Rfcomm;
 using Windows.Networking.Sockets;
 using Windows.Storage.Streams;
+using SekaiLink.Native.Windows.Internal;
+using SekaiLink.Protocols.Transport;
 
 namespace SekaiLink.Native.Windows;
 
@@ -16,22 +16,22 @@ public sealed class RfcommTransport : IProtocolTransport
 {
     private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
     private readonly SemaphoreSlim _writeLock = new(1, 1);
-    private readonly TransportKind _kind;
     private BluetoothDevice? _device;
-    private RfcommDeviceService? _service;
-    private StreamSocket? _socket;
+    private bool _disposed;
     private CancellationTokenSource? _readCancellation;
     private Task? _readTask;
-    private bool _disposed;
+    private RfcommDeviceService? _service;
+    private StreamSocket? _socket;
 
     public RfcommTransport(TransportKind kind = TransportKind.Rfcomm)
     {
         if (kind is not (TransportKind.Rfcomm or TransportKind.Spp))
             throw new ArgumentOutOfRangeException(nameof(kind));
-        _kind = kind;
+        Kind = kind;
     }
 
-    public TransportKind Kind => _kind;
+    public TransportKind Kind { get; }
+
     public TransportState State { get; private set; } = TransportState.Disconnected;
     public int? MaximumWriteLength => null;
 
@@ -41,8 +41,8 @@ public sealed class RfcommTransport : IProtocolTransport
     public async Task ConnectAsync(TransportEndpoint endpoint, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(endpoint);
-        if (endpoint.Kind != _kind && !(endpoint.Kind == TransportKind.Spp && _kind == TransportKind.Rfcomm))
-            throw new ArgumentException($"A {_kind} endpoint is required.", nameof(endpoint));
+        if (endpoint.Kind != Kind && !(endpoint.Kind == TransportKind.Spp && Kind == TransportKind.Rfcomm))
+            throw new ArgumentException($"A {Kind} endpoint is required.", nameof(endpoint));
 
         await _lifecycleLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -56,13 +56,16 @@ public sealed class RfcommTransport : IProtocolTransport
                 var serviceUuid = BluetoothEndpoint.RequireGuid(endpoint.ServiceId, nameof(endpoint.ServiceId));
                 cancellationToken.ThrowIfCancellationRequested();
                 _device = await OpenDeviceAsync(endpoint.Address).ConfigureAwait(false)
-                    ?? throw new InvalidOperationException("The Bluetooth device could not be opened. Pair it in Windows Settings first.");
+                          ?? throw new InvalidOperationException(
+                              "The Bluetooth device could not be opened. Pair it in Windows Settings first.");
 
-                var result = await _device.GetRfcommServicesForIdAsync(RfcommServiceId.FromUuid(serviceUuid), BluetoothCacheMode.Uncached);
+                var result = await _device.GetRfcommServicesForIdAsync(RfcommServiceId.FromUuid(serviceUuid),
+                    BluetoothCacheMode.Uncached);
                 if (result.Error != BluetoothError.Success)
                     throw new InvalidOperationException($"Failed to discover RFCOMM service: {result.Error}.");
                 _service = result.Services.FirstOrDefault()
-                    ?? throw new InvalidOperationException($"RFCOMM service {serviceUuid} was not found. The device may need to be paired first.");
+                           ?? throw new InvalidOperationException(
+                               $"RFCOMM service {serviceUuid} was not found. The device may need to be paired first.");
 
                 _socket = new StreamSocket();
                 await _socket.ConnectAsync(
@@ -127,17 +130,32 @@ public sealed class RfcommTransport : IProtocolTransport
             var readTask = _readTask;
             Cleanup();
             if (readTask is not null)
-            {
-                try { await readTask.ConfigureAwait(false); }
-                catch (OperationCanceledException) { }
-                catch { }
-            }
+                try
+                {
+                    await readTask.ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                }
+                catch
+                {
+                }
+
             SetState(TransportState.Disconnected);
         }
         finally
         {
             _lifecycleLock.Release();
         }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) return;
+        await DisconnectAsync().ConfigureAwait(false);
+        _disposed = true;
+        _lifecycleLock.Dispose();
+        _writeLock.Dispose();
     }
 
     private async Task ReadLoopAsync(StreamSocket socket, CancellationToken cancellationToken)
@@ -151,8 +169,10 @@ public sealed class RfcommTransport : IProtocolTransport
                 if (count == 0) break;
                 var bytes = new byte[count];
                 reader.ReadBytes(bytes);
-                DataReceived?.Invoke(this, new TransportDataReceivedEventArgs(bytes, _service?.ServiceId.Uuid.ToString("D")));
+                DataReceived?.Invoke(this,
+                    new TransportDataReceivedEventArgs(bytes, _service?.ServiceId.Uuid.ToString("D")));
             }
+
             if (!cancellationToken.IsCancellationRequested && State == TransportState.Ready)
                 SetState(TransportState.Disconnected);
         }
@@ -196,14 +216,5 @@ public sealed class RfcommTransport : IProtocolTransport
     private void ThrowIfDisposed()
     {
         if (_disposed) throw new ObjectDisposedException(nameof(RfcommTransport));
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (_disposed) return;
-        await DisconnectAsync().ConfigureAwait(false);
-        _disposed = true;
-        _lifecycleLock.Dispose();
-        _writeLock.Dispose();
     }
 }

@@ -7,34 +7,6 @@ namespace SekaiLink.ConsoleApp;
 /// <summary>Parses protocol-neutral shell verbs. A device mapper decides how to encode them.</summary>
 internal static class DeviceFeatureCommandParser
 {
-    public static FeatureDefinition Parse(IReadOnlyList<string> action)
-    {
-        if (action.Count == 0) throw new CommandLineException("Missing device operation.");
-        return action[0].ToLowerInvariant() switch
-        {
-            "get" => ParseRead(action),
-            "noise" => Write(FeatureIdentifiers.NoiseControl, ParseNoise(Argument(action, 1, "noise <mode>"))),
-            "anc-level" => Write(FeatureIdentifiers.NoiseCancellationLevel, Choice(action, "anc-level", 1, 3, 5)),
-            "transparency-level" => Write(FeatureIdentifiers.TransparencyLevel, Choice(action, "transparency-level", 1, 3, 5)),
-            "prompt-level" => Write(FeatureIdentifiers.PromptToneLevel, Choice(action, "prompt-level", 1, 2, 3, 4, 5)),
-            "anc-line" => ParseNoiseCycle(action),
-            "game" => Write(FeatureIdentifiers.LowLatency, Switch(Argument(action, 1, "game <on|off>"))),
-            "eq" => Write(FeatureIdentifiers.Equalizer, Argument(action, 1, "eq <preset>")),
-            "multipoint" => Write(FeatureIdentifiers.Multipoint, Switch(Argument(action, 1, "multipoint <on|off>"))),
-            "audio" => Write(FeatureIdentifiers.AudioCodec, ParseAudio(Argument(action, 1, "audio <ldac|aac-sbc>"))),
-            "spatial" => Write(FeatureIdentifiers.SpatialAudio, ParseSpatial(Argument(action, 1, "spatial <off|head|fixed>"))),
-            "language" => Write(FeatureIdentifiers.DeviceLanguage, ParseLanguage(Argument(action, 1, "language <chinese|english>"))),
-            "hearing-protection" => Write(FeatureIdentifiers.HearingProtection, Number(action, "hearing-protection")),
-            "gain-level" => Write(FeatureIdentifiers.GainLevel, Number(action, "gain-level")),
-            "mic" => ParseMicrophone(action),
-            "wear-detection" => Write(FeatureIdentifiers.WearDetection, Switch(Argument(action, 1, "wear-detection <on|off>"))),
-            "touch" => Write(FeatureIdentifiers.TouchControls, Switch(Argument(action, 1, "touch <on|off>"))),
-            "touch-map" => ParseTouchMapping(action),
-            "find" => ParseFind(action),
-            _ => throw new CommandLineException($"Unknown device operation '{action[0]}'.")
-        };
-    }
-
     public static IReadOnlyList<(string Syntax, FeatureDefinition Command)> Examples { get; } = new[]
     {
         ("get info", Read(FeatureIdentifiers.DeviceInformation)),
@@ -85,6 +57,38 @@ internal static class DeviceFeatureCommandParser
         ("prompt-level 5", Write(FeatureIdentifiers.PromptToneLevel, 5))
     };
 
+    public static FeatureDefinition Parse(IReadOnlyList<string> action)
+    {
+        if (action.Count == 0) throw new CommandLineException("Missing device operation.");
+        return action[0].ToLowerInvariant() switch
+        {
+            "get" => ParseRead(action),
+            "noise" => Write(FeatureIdentifiers.NoiseControl, ParseNoise(Argument(action, 1, "noise <mode>"))),
+            "anc-level" => Write(FeatureIdentifiers.NoiseCancellationLevel, Choice(action, "anc-level", 1, 3, 5)),
+            "transparency-level" => Write(FeatureIdentifiers.TransparencyLevel,
+                Choice(action, "transparency-level", 1, 3, 5)),
+            "prompt-level" => Write(FeatureIdentifiers.PromptToneLevel, Choice(action, "prompt-level", 1, 2, 3, 4, 5)),
+            "anc-line" => ParseNoiseCycle(action),
+            "game" => Write(FeatureIdentifiers.LowLatency, Switch(Argument(action, 1, "game <on|off>"))),
+            "eq" => Write(FeatureIdentifiers.Equalizer, Argument(action, 1, "eq <preset>")),
+            "multipoint" => Write(FeatureIdentifiers.Multipoint, Switch(Argument(action, 1, "multipoint <on|off>"))),
+            "audio" => Write(FeatureIdentifiers.AudioCodec, ParseAudio(Argument(action, 1, "audio <ldac|aac-sbc>"))),
+            "spatial" => Write(FeatureIdentifiers.SpatialAudio,
+                ParseSpatial(Argument(action, 1, "spatial <off|head|fixed>"))),
+            "language" => Write(FeatureIdentifiers.DeviceLanguage,
+                ParseLanguage(Argument(action, 1, "language <chinese|english>"))),
+            "hearing-protection" => Write(FeatureIdentifiers.HearingProtection, Number(action, "hearing-protection")),
+            "gain-level" => Write(FeatureIdentifiers.GainLevel, Number(action, "gain-level")),
+            "mic" => ParseMicrophone(action),
+            "wear-detection" => Write(FeatureIdentifiers.WearDetection,
+                Switch(Argument(action, 1, "wear-detection <on|off>"))),
+            "touch" => Write(FeatureIdentifiers.TouchControls, Switch(Argument(action, 1, "touch <on|off>"))),
+            "touch-map" => ParseTouchMapping(action),
+            "find" => ParseFind(action),
+            _ => throw new CommandLineException($"Unknown device operation '{action[0]}'.")
+        };
+    }
+
     public static IEnumerable<string> HelpLines()
     {
         yield return "  init                              run device-defined initialization queries";
@@ -111,31 +115,35 @@ internal static class DeviceFeatureCommandParser
         yield return "  raw <hex>                         send an already framed packet";
     }
 
-    private static FeatureDefinition ParseRead(IReadOnlyList<string> action) => Read(
-        Argument(action, 1, "get <feature>").ToLowerInvariant() switch
-        {
-            "info" => FeatureIdentifiers.DeviceInformation,
-            "battery" => FeatureIdentifiers.Battery,
-            "noise" => FeatureIdentifiers.NoiseControl,
-            "eq" => FeatureIdentifiers.Equalizer,
-            "game" => FeatureIdentifiers.LowLatency,
-            "spatial" => FeatureIdentifiers.SpatialAudio,
-            "audio" => FeatureIdentifiers.AudioCodec,
-            "multipoint" => FeatureIdentifiers.Multipoint,
-            "version" => FeatureIdentifiers.FirmwareVersion,
-            "touch-map" or "key" => FeatureIdentifiers.GestureMappings,
-            "touch" => FeatureIdentifiers.TouchControls,
-            "noise-list" => FeatureIdentifiers.NoiseControlCycle,
-            "wear" or "wear-detection" => FeatureIdentifiers.WearDetection,
-            "anc-level" => FeatureIdentifiers.NoiseCancellationLevel,
-            "transparency-level" => FeatureIdentifiers.TransparencyLevel,
-            "prompt-level" => FeatureIdentifiers.PromptToneLevel,
-            var value => throw new CommandLineException($"Unknown feature '{value}'.")
-        });
+    private static FeatureDefinition ParseRead(IReadOnlyList<string> action)
+    {
+        return Read(
+            Argument(action, 1, "get <feature>").ToLowerInvariant() switch
+            {
+                "info" => FeatureIdentifiers.DeviceInformation,
+                "battery" => FeatureIdentifiers.Battery,
+                "noise" => FeatureIdentifiers.NoiseControl,
+                "eq" => FeatureIdentifiers.Equalizer,
+                "game" => FeatureIdentifiers.LowLatency,
+                "spatial" => FeatureIdentifiers.SpatialAudio,
+                "audio" => FeatureIdentifiers.AudioCodec,
+                "multipoint" => FeatureIdentifiers.Multipoint,
+                "version" => FeatureIdentifiers.FirmwareVersion,
+                "touch-map" or "key" => FeatureIdentifiers.GestureMappings,
+                "touch" => FeatureIdentifiers.TouchControls,
+                "noise-list" => FeatureIdentifiers.NoiseControlCycle,
+                "wear" or "wear-detection" => FeatureIdentifiers.WearDetection,
+                "anc-level" => FeatureIdentifiers.NoiseCancellationLevel,
+                "transparency-level" => FeatureIdentifiers.TransparencyLevel,
+                "prompt-level" => FeatureIdentifiers.PromptToneLevel,
+                var value => throw new CommandLineException($"Unknown feature '{value}'.")
+            });
+    }
 
     private static FeatureDefinition ParseNoiseCycle(IReadOnlyList<string> action)
     {
-        if (action.Count != 5) throw new CommandLineException("Usage: anc-line <normal 0|1> <transparency 0|1> <wind 0|1> <anc 0|1>.");
+        if (action.Count != 5)
+            throw new CommandLineException("Usage: anc-line <normal 0|1> <transparency 0|1> <wind 0|1> <anc 0|1>.");
         return Write(FeatureIdentifiers.NoiseControlCycle, new NoiseControlCycle
         {
             Normal = Bit(action[1]),
@@ -177,61 +185,76 @@ internal static class DeviceFeatureCommandParser
         return Write(FeatureIdentifiers.GestureMappings, new GestureMapping(side, gesture, touchAction));
     }
 
-    private static FeatureDefinition ParseFind(IReadOnlyList<string> action) =>
-        Argument(action, 1, "find <left|right|off>").ToLowerInvariant() switch
+    private static FeatureDefinition ParseFind(IReadOnlyList<string> action)
+    {
+        return Argument(action, 1, "find <left|right|off>").ToLowerInvariant() switch
         {
             "left" => Write(FeatureIdentifiers.FindDevice, FindDeviceAction.Left),
             "right" => Write(FeatureIdentifiers.FindDevice, FindDeviceAction.Right),
             "off" or "stop" => Write(FeatureIdentifiers.FindDevice, FindDeviceAction.Stop),
             _ => throw new CommandLineException("Find target must be left, right or off.")
         };
+    }
 
-    private static object ParseNoise(string value) => value.ToLowerInvariant() switch
+    private static object ParseNoise(string value)
     {
-        "normal" or "off" => NoiseModeId.Normal,
-        "anc" or "on" => NoiseModeId.NoiseCancellation,
-        "transparency" or "trans" or "ambient" => NoiseModeId.Transparency,
-        "wind" => NoiseModeId.WindReduction,
-        "adaptive" or "auto" => NoiseModeId.AdaptiveNoiseCancellation,
-        // Vendor catalogues may expose additional selectable submodes.
-        _ => value
-    };
+        return value.ToLowerInvariant() switch
+        {
+            "normal" or "off" => NoiseModeId.Normal,
+            "anc" or "on" => NoiseModeId.NoiseCancellation,
+            "transparency" or "trans" or "ambient" => NoiseModeId.Transparency,
+            "wind" => NoiseModeId.WindReduction,
+            "adaptive" or "auto" => NoiseModeId.AdaptiveNoiseCancellation,
+            // Vendor catalogues may expose additional selectable submodes.
+            _ => value
+        };
+    }
 
-    private static AudioCodecMode ParseAudio(string value) => value.ToLowerInvariant() switch
+    private static AudioCodecMode ParseAudio(string value)
     {
-        "ldac" => AudioCodecMode.Ldac,
-        "aac-sbc" or "aac" or "sbc" or "multipoint" => AudioCodecMode.AacSbc,
-        "lhdc" => AudioCodecMode.Lhdc,
-        "lc3" => AudioCodecMode.Lc3,
-        "aptx" => AudioCodecMode.Aptx,
-        "aptx-hd" => AudioCodecMode.AptxHd,
-        "aptx-adaptive" => AudioCodecMode.AptxAdaptive,
-        _ => throw new CommandLineException("Audio mode must be ldac or aac-sbc.")
-    };
+        return value.ToLowerInvariant() switch
+        {
+            "ldac" => AudioCodecMode.Ldac,
+            "aac-sbc" or "aac" or "sbc" or "multipoint" => AudioCodecMode.AacSbc,
+            "lhdc" => AudioCodecMode.Lhdc,
+            "lc3" => AudioCodecMode.Lc3,
+            "aptx" => AudioCodecMode.Aptx,
+            "aptx-hd" => AudioCodecMode.AptxHd,
+            "aptx-adaptive" => AudioCodecMode.AptxAdaptive,
+            _ => throw new CommandLineException("Audio mode must be ldac or aac-sbc.")
+        };
+    }
 
-    private static SpatialAudioMode ParseSpatial(string value) => value.ToLowerInvariant() switch
+    private static SpatialAudioMode ParseSpatial(string value)
     {
-        "off" => SpatialAudioMode.Off,
-        "head" or "head-tracking" => SpatialAudioMode.HeadTracking,
-        "fixed" => SpatialAudioMode.Fixed,
-        "music" => SpatialAudioMode.Music,
-        "movie" => SpatialAudioMode.Movie,
-        "game" => SpatialAudioMode.Game,
-        "tv" or "television" => SpatialAudioMode.Television,
-        _ => throw new CommandLineException("Unknown spatial audio mode.")
-    };
+        return value.ToLowerInvariant() switch
+        {
+            "off" => SpatialAudioMode.Off,
+            "head" or "head-tracking" => SpatialAudioMode.HeadTracking,
+            "fixed" => SpatialAudioMode.Fixed,
+            "music" => SpatialAudioMode.Music,
+            "movie" => SpatialAudioMode.Movie,
+            "game" => SpatialAudioMode.Game,
+            "tv" or "television" => SpatialAudioMode.Television,
+            _ => throw new CommandLineException("Unknown spatial audio mode.")
+        };
+    }
 
-    private static DeviceLanguage ParseLanguage(string value) => value.ToLowerInvariant() switch
+    private static DeviceLanguage ParseLanguage(string value)
     {
-        "zh" or "cn" or "chinese" => DeviceLanguage.Chinese,
-        "en" or "english" => DeviceLanguage.English,
-        _ => throw new CommandLineException("Language must be chinese or english.")
-    };
+        return value.ToLowerInvariant() switch
+        {
+            "zh" or "cn" or "chinese" => DeviceLanguage.Chinese,
+            "en" or "english" => DeviceLanguage.English,
+            _ => throw new CommandLineException("Language must be chinese or english.")
+        };
+    }
 
     private static int Number(IReadOnlyList<string> action, string name)
     {
         var text = Argument(action, 1, $"{name} <0-255>");
-        if (!int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) || value < 0 || value > 255)
+        if (!int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) || value < 0 ||
+            value > 255)
             throw new CommandLineException($"{name} must be between 0 and 255.");
         return value;
     }
@@ -239,6 +262,7 @@ internal static class DeviceFeatureCommandParser
     private static FeatureDefinition ParseMicrophone(IReadOnlyList<string> action)
     {
         if (action.Count < 3) throw new CommandLineException("Usage: mic <opcode-hex> <byte> [byte...].");
+
         static byte HexByte(string value)
         {
             var text = value.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? value[2..] : value;
@@ -246,30 +270,39 @@ internal static class DeviceFeatureCommandParser
                 throw new CommandLineException($"Invalid hexadecimal byte '{value}'.");
             return result;
         }
-        return Write(FeatureIdentifiers.MicrophoneControl, new MicrophoneCommand(HexByte(action[1]), action.Skip(2).Select(HexByte).ToArray()));
+
+        return Write(FeatureIdentifiers.MicrophoneControl,
+            new MicrophoneCommand(HexByte(action[1]), action.Skip(2).Select(HexByte).ToArray()));
     }
 
     private static int Choice(IReadOnlyList<string> action, string name, params int[] choices)
     {
         var text = Argument(action, 1, $"{name} <{string.Join('|', choices)}>");
-        if (!int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) || !choices.Contains(value))
+        if (!int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) ||
+            !choices.Contains(value))
             throw new CommandLineException($"{name} must be one of: {string.Join(", ", choices)}.");
         return value;
     }
 
-    private static bool Switch(string value) => value.ToLowerInvariant() switch
+    private static bool Switch(string value)
     {
-        "on" or "true" or "1" => true,
-        "off" or "false" or "0" => false,
-        _ => throw new CommandLineException("Switch value must be on or off.")
-    };
+        return value.ToLowerInvariant() switch
+        {
+            "on" or "true" or "1" => true,
+            "off" or "false" or "0" => false,
+            _ => throw new CommandLineException("Switch value must be on or off.")
+        };
+    }
 
-    private static bool Bit(string value) => value switch
+    private static bool Bit(string value)
     {
-        "1" => true,
-        "0" => false,
-        _ => throw new CommandLineException("Cycle values must be 0 or 1.")
-    };
+        return value switch
+        {
+            "1" => true,
+            "0" => false,
+            _ => throw new CommandLineException("Cycle values must be 0 or 1.")
+        };
+    }
 
     private static string Argument(IReadOnlyList<string> action, int index, string usage)
     {
@@ -277,6 +310,13 @@ internal static class DeviceFeatureCommandParser
         return action[index];
     }
 
-    private static FeatureDefinition Read(string identifier) => new(identifier);
-    private static FeatureDefinition Write(string identifier, object value) => new(identifier, value);
+    private static FeatureDefinition Read(string identifier)
+    {
+        return new FeatureDefinition(identifier);
+    }
+
+    private static FeatureDefinition Write(string identifier, object value)
+    {
+        return new FeatureDefinition(identifier, value);
+    }
 }

@@ -4,38 +4,40 @@ using SekaiLink.Protocols.Features;
 using SekaiLink.Protocols.Models;
 using SekaiLink.Rose.Protocol.Protocols;
 
-namespace SekaiLink.Rose.Devices.Devices.Zt
+namespace SekaiLink.Rose.Devices.Devices.Zt;
+
+/// <summary>
+///     Exact ZT229 feature mapping recovered from RoseLink 3.8.0's Zt229Sender.
+///     A RoseFrame payload contains the bytes after the ZT reserved byte and before the checksum.
+/// </summary>
+internal sealed class Zt229FeatureCommandMapper : IFeatureCommandMapper<RoseFrame>
 {
-    /// <summary>
-    /// Exact ZT229 feature mapping recovered from RoseLink 3.8.0's Zt229Sender.
-    /// A RoseFrame payload contains the bytes after the ZT reserved byte and before the checksum.
-    /// </summary>
-    internal sealed class Zt229FeatureCommandMapper : IFeatureCommandMapper<RoseFrame>
+    public IReadOnlyList<FeatureDefinition> InitializationCommands { get; } = new[]
     {
-        public IReadOnlyList<FeatureDefinition> InitializationCommands { get; } = new[]
-        {
-            Read(FeatureIdentifiers.DeviceInformation),
-            Read(FeatureIdentifiers.NoiseControl),
-            Read(FeatureIdentifiers.Equalizer),
-            Read(FeatureIdentifiers.LowLatency),
-            Read(FeatureIdentifiers.AudioCodec),
-            Read(FeatureIdentifiers.FirmwareVersion),
-            Read(FeatureIdentifiers.GestureMappings),
-            Read(FeatureIdentifiers.TouchControls),
-            Read(FeatureIdentifiers.NoiseControlCycle),
-            Read(FeatureIdentifiers.WearDetection),
-            Read(FeatureIdentifiers.NoiseCancellationLevel),
-            Read(FeatureIdentifiers.TransparencyLevel),
-            Read(FeatureIdentifiers.PromptToneLevel)
-        };
+        Read(FeatureIdentifiers.DeviceInformation),
+        Read(FeatureIdentifiers.NoiseControl),
+        Read(FeatureIdentifiers.Equalizer),
+        Read(FeatureIdentifiers.LowLatency),
+        Read(FeatureIdentifiers.AudioCodec),
+        Read(FeatureIdentifiers.FirmwareVersion),
+        Read(FeatureIdentifiers.GestureMappings),
+        Read(FeatureIdentifiers.TouchControls),
+        Read(FeatureIdentifiers.NoiseControlCycle),
+        Read(FeatureIdentifiers.WearDetection),
+        Read(FeatureIdentifiers.NoiseCancellationLevel),
+        Read(FeatureIdentifiers.TransparencyLevel),
+        Read(FeatureIdentifiers.PromptToneLevel)
+    };
 
-        public RoseFrame Encode(FeatureDefinition command)
-        {
-            if (command == null) throw new ArgumentNullException(nameof(command));
-            return command.Value == null ? EncodeRead(command.Identifier) : EncodeWrite(command);
-        }
+    public RoseFrame Encode(FeatureDefinition command)
+    {
+        if (command == null) throw new ArgumentNullException(nameof(command));
+        return command.Value == null ? EncodeRead(command.Identifier) : EncodeWrite(command);
+    }
 
-        public string? GetResponseIdentifier(RoseFrame frame) => (frame.Group, frame.Command) switch
+    public string? GetResponseIdentifier(RoseFrame frame)
+    {
+        return (frame.Group, frame.Command) switch
         {
             (0x01, 0x01) => FeatureIdentifiers.DeviceInformation,
             (0x01, 0x03) => FeatureIdentifiers.Battery,
@@ -55,8 +57,11 @@ namespace SekaiLink.Rose.Devices.Devices.Zt
             (0x08, 0x02) => FeatureIdentifiers.Multipoint,
             _ => null
         };
+    }
 
-        private static RoseFrame EncodeRead(string identifier) => identifier switch
+    private static RoseFrame EncodeRead(string identifier)
+    {
+        return identifier switch
         {
             FeatureIdentifiers.DeviceInformation or FeatureIdentifiers.Battery => Frame(0x01, 0x01),
             FeatureIdentifiers.NoiseControl => Frame(0x06, 0x02),
@@ -73,8 +78,11 @@ namespace SekaiLink.Rose.Devices.Devices.Zt
             FeatureIdentifiers.PromptToneLevel => Frame(0x0E, 0x03),
             _ => throw new NotSupportedException($"ZT229 does not support reading feature '{identifier}'.")
         };
+    }
 
-        private static RoseFrame EncodeWrite(FeatureDefinition command) => command.Identifier switch
+    private static RoseFrame EncodeWrite(FeatureDefinition command)
+    {
+        return command.Identifier switch
         {
             FeatureIdentifiers.NoiseControl => SetNoiseMode(Require<NoiseModeId>(command)),
             FeatureIdentifiers.NoiseControlCycle => SetNoiseCycle(Require<NoiseControlCycle>(command)),
@@ -91,8 +99,11 @@ namespace SekaiLink.Rose.Devices.Devices.Zt
             FeatureIdentifiers.FindDevice => SetFindDevice(Require<FindDeviceAction>(command)),
             _ => throw new NotSupportedException($"ZT229 does not support writing feature '{command.Identifier}'.")
         };
+    }
 
-        private static RoseFrame SetNoiseMode(NoiseModeId mode) => mode switch
+    private static RoseFrame SetNoiseMode(NoiseModeId mode)
+    {
+        return mode switch
         {
             NoiseModeId.Transparency => Frame(0x06, 0x82, 0x00, 0x00, 0x00, 0x01),
             NoiseModeId.Normal => Frame(0x06, 0x82, 0x00, 0x01, 0x00, 0x00),
@@ -101,49 +112,58 @@ namespace SekaiLink.Rose.Devices.Devices.Zt
             NoiseModeId.AdaptiveNoiseCancellation => Frame(0x06, 0x82, 0x02, 0x00, 0x00, 0x00),
             _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unsupported ZT229 noise mode.")
         };
+    }
 
-        private static RoseFrame SetNoiseCycle(NoiseControlCycle value) => Frame(
+    private static RoseFrame SetNoiseCycle(NoiseControlCycle value)
+    {
+        return Frame(
             0x06,
             0x85,
             Bit(value.Normal),
             Bit(value.Transparency),
             Bit(value.WindReduction),
             Bit(value.NoiseCancellation));
+    }
 
-        private static RoseFrame SetPromptLevel(int level)
+    private static RoseFrame SetPromptLevel(int level)
+    {
+        if (level < 1 || level > 5)
+            throw new ArgumentOutOfRangeException(nameof(level), "Prompt level must be 1..5.");
+        return Frame(0x0E, 0x83, (byte)(level - 1));
+    }
+
+    private static RoseFrame SetEqualizer(object value)
+    {
+        var id = value switch
         {
-            if (level < 1 || level > 5)
-                throw new ArgumentOutOfRangeException(nameof(level), "Prompt level must be 1..5.");
-            return Frame(0x0E, 0x83, (byte)(level - 1));
-        }
-
-        private static RoseFrame SetEqualizer(object value)
+            EqualizerPreset preset => preset.Id,
+            string identifier => identifier,
+            _ => throw InvalidValue(FeatureIdentifiers.Equalizer, typeof(string), value)
+        };
+        var presetValue = id.ToLowerInvariant() switch
         {
-            var id = value switch
-            {
-                EqualizerPreset preset => preset.Id,
-                string identifier => identifier,
-                _ => throw InvalidValue(FeatureIdentifiers.Equalizer, typeof(string), value)
-            };
-            var presetValue = id.ToLowerInvariant() switch
-            {
-                "pop" => (byte)0,
-                "hifi" => (byte)1,
-                "rock" => (byte)2,
-                "light" => (byte)3,
-                _ => throw new ArgumentOutOfRangeException(nameof(value), id, "Unsupported ZT229 equalizer preset.")
-            };
-            return Frame(0x02, 0x81, presetValue);
-        }
+            "pop" => (byte)0,
+            "hifi" => (byte)1,
+            "rock" => (byte)2,
+            "light" => (byte)3,
+            _ => throw new ArgumentOutOfRangeException(nameof(value), id, "Unsupported ZT229 equalizer preset.")
+        };
+        return Frame(0x02, 0x81, presetValue);
+    }
 
-        private static RoseFrame SetAudioCodec(AudioCodecMode value) => value switch
+    private static RoseFrame SetAudioCodec(AudioCodecMode value)
+    {
+        return value switch
         {
             AudioCodecMode.AacSbc => Frame(0x08, 0x81, 0x00),
             AudioCodecMode.Ldac => Frame(0x08, 0x81, 0x01),
             _ => throw new ArgumentOutOfRangeException(nameof(value), value, "Unsupported ZT229 audio codec.")
         };
+    }
 
-        private static RoseFrame SetGesture(GestureMapping value) => Frame(
+    private static RoseFrame SetGesture(GestureMapping value)
+    {
+        return Frame(
             0x04,
             0x81,
             value.Side switch
@@ -172,42 +192,61 @@ namespace SekaiLink.Rose.Devices.Devices.Zt
                 GestureAction.NoiseControl => (byte)7,
                 _ => throw new ArgumentOutOfRangeException(nameof(value))
             });
+    }
 
-        private static RoseFrame SetFindDevice(FindDeviceAction value) => value switch
+    private static RoseFrame SetFindDevice(FindDeviceAction value)
+    {
+        return value switch
         {
             FindDeviceAction.Stop => Frame(0x0E, 0x82, 0x03, 0x00),
             FindDeviceAction.Left => Frame(0x0E, 0x82, 0x00, 0x01),
             FindDeviceAction.Right => Frame(0x0E, 0x82, 0x01, 0x01),
             _ => throw new ArgumentOutOfRangeException(nameof(value))
         };
+    }
 
-        private static RoseFrame Frame(byte group, byte command, params byte[] payload) =>
-            new RoseFrame(group, command, payload);
+    private static RoseFrame Frame(byte group, byte command, params byte[] payload)
+    {
+        return new RoseFrame(group, command, payload);
+    }
 
-        private static byte Bit(bool value) => value ? (byte)1 : (byte)0;
+    private static byte Bit(bool value)
+    {
+        return value ? (byte)1 : (byte)0;
+    }
 
-        // ZT229 uses inverted Boolean values for game mode, wear detection, and touch control.
-        private static byte Inverted(bool value) => value ? (byte)0 : (byte)1;
+    // ZT229 uses inverted Boolean values for game mode, wear detection, and touch control.
+    private static byte Inverted(bool value)
+    {
+        return value ? (byte)0 : (byte)1;
+    }
 
-        private static byte MapNoiseLevel(int level) => level switch
+    private static byte MapNoiseLevel(int level)
+    {
+        return level switch
         {
             1 => 0,
             3 => 1,
             5 => 2,
             _ => throw new ArgumentOutOfRangeException(nameof(level), "Noise level must be 1, 3, or 5.")
         };
+    }
 
-        private static T Require<T>(FeatureDefinition command)
-        {
-            if (command.Value is T value) return value;
-            throw InvalidValue(command.Identifier, typeof(T), command.Value);
-        }
+    private static T Require<T>(FeatureDefinition command)
+    {
+        if (command.Value is T value) return value;
+        throw InvalidValue(command.Identifier, typeof(T), command.Value);
+    }
 
-        private static ArgumentException InvalidValue(string identifier, Type expected, object? actual) =>
-            new ArgumentException(
-                $"Feature '{identifier}' expects {expected.Name}, but received {actual?.GetType().Name ?? "null"}.",
-                "command");
+    private static ArgumentException InvalidValue(string identifier, Type expected, object? actual)
+    {
+        return new ArgumentException(
+            $"Feature '{identifier}' expects {expected.Name}, but received {actual?.GetType().Name ?? "null"}.",
+            "command");
+    }
 
-        private static FeatureDefinition Read(string identifier) => new FeatureDefinition(identifier);
+    private static FeatureDefinition Read(string identifier)
+    {
+        return new FeatureDefinition(identifier);
     }
 }
